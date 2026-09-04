@@ -1,6 +1,6 @@
 # Testing
 
-**955 tests, 100 % de cobertura.** El gate obligatorio es del 85 %.
+**957 tests, 100 % de cobertura.** El gate obligatorio es del 85 %.
 
 ```bash
 python -m pytest --cov
@@ -15,7 +15,7 @@ python -m pytest tests/test_audit.py -v
 
 | Modo | Tests | Qué verifica |
 |---|---|---|
-| **Con PostgreSQL** | 955 | Todo |
+| **Con PostgreSQL** | 957 | Todo |
 | **Sin PostgreSQL** | ~470 | Contrato del DER, migraciones, prompts, saneado de Sentry, validadores, parsers, contenedor |
 
 Los módulos que necesitan base se saltan solos (`tests/db.py`). **Que un módulo se salte no es lo
