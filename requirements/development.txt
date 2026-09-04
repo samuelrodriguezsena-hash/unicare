@@ -1,0 +1,5 @@
+-r base.txt
+-r testing.txt
+
+django-extensions==4.1
+ipython==9.4.0

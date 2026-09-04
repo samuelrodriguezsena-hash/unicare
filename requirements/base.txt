@@ -1,0 +1,24 @@
+# UniCare — dependencias comunes a todos los entornos.
+# Ver docs/DECISIONS.md para el porqué de cada elección del stack.
+
+Django==5.2.6
+djangorestframework==3.16.0
+djangorestframework-simplejwt==5.5.0
+django-filter==25.1
+django-cors-headers==4.7.0
+
+psycopg[binary]==3.2.13
+dj-database-url==3.0.0
+
+celery==5.5.3
+redis==6.2.0
+
+httpx==0.28.1
+google-genai==1.29.0
+
+sentry-sdk[django,celery]==2.35.0
+python-dotenv==1.1.1
+gunicorn==23.0.0
+
+# Carga masiva (massive_load): XLSX.  El CSV se procesa con la stdlib.
+openpyxl==3.1.5

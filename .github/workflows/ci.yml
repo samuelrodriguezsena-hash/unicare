@@ -1,0 +1,212 @@
+# Pipeline de integracion continua de UniCare.
+#
+# Falla si: el formato no es el esperado, el lint protesta, algun test falla, o
+# la cobertura baja del 85 %. El build de la imagen solo se intenta si todo lo
+# anterior paso.
+#
+# Los mismos pasos se pueden ejecutar en local con `scripts/ci.sh`, para no
+# descubrir aqui algo que se podia haber visto antes de subir.
+
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # Un push nuevo cancela la ejecucion anterior de la misma rama.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # DEC-13: el runtime del contenedor es Python 3.12.
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  calidad:
+    name: Formato, lint y tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        # Misma version que docker-compose y que el entorno de verificacion.
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: unicare
+          POSTGRES_PASSWORD: unicare
+          POSTGRES_DB: unicare
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U unicare"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.testing
+      DATABASE_URL: postgres://unicare:unicare@localhost:5432/unicare
+      # `testing` fija valores por defecto para el resto; se declaran aqui de
+      # forma explicita para que el pipeline no dependa de ellos.
+      REDIS_URL: redis://localhost:6379/0
+      FARMACOS_API_BASE_URL: https://farmacos.invalid
+      GEMINI_API_KEY: ""
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements/*.txt
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/testing.txt
+
+      # Formato y lint van antes que los tests: son segundos, y un fallo aqui
+      # no merece esperar a la suite entera.
+      - name: Formato (black)
+        run: black --check --diff .
+
+      - name: Lint (ruff)
+        run: ruff check --output-format=github .
+
+      - name: Lint (flake8)
+        run: flake8 .
+
+      - name: Comprobaciones de Django
+        run: python manage.py check
+
+      - name: Migraciones sincronizadas con los modelos
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Tests y cobertura
+        run: pytest --cov --cov-report=term-missing --cov-report=xml
+
+      # Redundante con el `fail_under` de pyproject.toml, pero deja el gate
+      # visible como un paso propio en el log.
+      - name: Gate de cobertura (85 %)
+        run: coverage report --fail-under=85
+
+      - name: Publicar el informe de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura
+          path: coverage.xml
+          if-no-files-found: warn
+
+  configuracion-de-produccion:
+    name: Settings de produccion
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements/*.txt
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/production.txt
+
+      # Los tests usan `config.settings.testing`; un error en las settings de
+      # produccion solo aparecería al desplegar si no se comprueba aqui.
+      # La clave NO es un secreto, pero tiene que superar los 50 caracteres:
+      # `check --deploy` emite W009 con una mas corta y `--fail-level WARNING`
+      # convierte ese aviso en un fallo del pipeline.
+      - name: check --deploy
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.production
+          DJANGO_SECRET_KEY: clave-de-pruebas-sin-ningun-valor-real-0123456789abcdef-unicare
+          DJANGO_ALLOWED_HOSTS: example.com
+          DATABASE_URL: postgres://u:p@db:5432/d
+          REDIS_URL: redis://r:6379/0
+          FARMACOS_API_BASE_URL: https://farmacos.invalid
+          SENTRY_DSN: ""
+          DJANGO_SECURE_SSL_REDIRECT: "True"
+        run: python manage.py check --deploy --fail-level WARNING
+
+      # `docker compose config` valida y resuelve el fichero sin tocar el
+      # daemon: detecta una clave mal escrita, una referencia rota o una
+      # variable sin definir antes de que lo haga un despliegue.
+      - name: El compose de produccion es valido
+        run: |
+          cat > .env.ci <<'EOF'
+          DJANGO_SECRET_KEY=clave-de-pruebas-sin-ningun-valor-real-0123456789abcdef-unicare
+          DJANGO_ALLOWED_HOSTS=example.com
+          DATABASE_URL=postgres://u:p@db:5432/d
+          REDIS_URL=redis://redis:6379/0
+          FARMACOS_API_BASE_URL=https://farmacos.invalid
+          POSTGRES_USER=unicare
+          POSTGRES_PASSWORD=solo-para-ci
+          POSTGRES_DB=unicare
+          EOF
+          cp .env.ci .env.production
+          docker compose --env-file .env.production -f docker-compose.prod.yml \
+            --profile db-local config --quiet
+          rm -f .env.ci .env.production
+
+  imagen:
+    name: Build de la imagen
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Solo si el codigo ya paso: construir una imagen de codigo roto no aporta.
+    needs: [calidad, configuracion-de-produccion]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Construir la imagen de produccion
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: unicare:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Comprobacion minima de que la imagen arranca y trae lo necesario.
+      - name: La imagen es utilizable
+        run: |
+          docker run --rm --entrypoint python unicare:ci -c "import django; print(django.get_version())"
+          docker run --rm --entrypoint sh unicare:ci -c "test -x /app/scripts/entrypoint.sh"
+
+      # La unica comprobacion que no se puede hacer sin construir la imagen:
+      # arrancarla de verdad y esperar a que su propio HEALTHCHECK la declare
+      # sana. Cubre gunicorn, el entrypoint, las settings de produccion y la
+      # sonda a la vez. No necesita PostgreSQL: la liveness no toca la base.
+      - name: El contenedor arranca y se declara sano
+        run: |
+          docker run -d --name unicare-humo \
+            -e DJANGO_SECRET_KEY=clave-de-pruebas-sin-ningun-valor-real-0123456789abcdef-unicare \
+            -e DJANGO_ALLOWED_HOSTS=example.com \
+            -e DATABASE_URL=postgres://u:p@db:5432/d \
+            -e REDIS_URL=redis://redis:6379/0 \
+            -e FARMACOS_API_BASE_URL=https://farmacos.invalid \
+            unicare:ci
+          estado=desconocido
+          for _ in $(seq 1 60); do
+            estado=$(docker inspect -f '{{.State.Health.Status}}' unicare-humo)
+            if [ "$estado" != "starting" ]; then
+              break
+            fi
+            sleep 2
+          done
+          echo "Estado de salud: $estado"
+          docker logs unicare-humo
+          docker rm -f unicare-humo >/dev/null
+          test "$estado" = "healthy"

@@ -1,0 +1,17 @@
+-r base.txt
+
+pytest==8.4.1
+pytest-django==4.11.1
+pytest-cov==6.2.1
+factory-boy==3.3.3
+coverage==7.10.2
+
+# Mock del transporte httpx: la API de farmacos NUNCA se llama de verdad en tests.
+respx==0.22.0
+
+# Los tests del contenedor leen docker-compose.prod.yml y el workflow de CI.
+PyYAML==6.0.3
+
+black==25.1.0
+ruff==0.12.7
+flake8==7.3.0

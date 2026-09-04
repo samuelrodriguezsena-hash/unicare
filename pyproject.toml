@@ -1,0 +1,66 @@
+[project]
+name = "unicare"
+version = "0.1.0"
+description = "Backend de gestion de pacientes oncologicos"
+requires-python = ">=3.12"
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+extend-exclude = '''
+/(
+  | migrations
+)/
+'''
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+extend-exclude = ["**/migrations/*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "DJ", "S", "RUF"]
+ignore = [
+    "S101",   # assert: legitimo en tests
+    "RUF012", # atributos mutables de clase: comun en Django/DRF
+    # DJ001 recomienda blank="" en lugar de null=True en campos de texto. El DER
+    # declara explicitamente esas columnas como nullable y el DER es el contrato:
+    # usar cadena vacia cambiaria la semantica del esquema ("sin dato" pasaria a
+    # ser un dato). Regla del proyecto: si una buena practica contradice el DER,
+    # gana el DER.
+    "DJ001",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"config/settings/*.py" = ["F403", "F405"]  # `from .base import *` es deliberado
+"tests/**/*.py" = ["S105", "S106"]         # credenciales de prueba, no secretos
+
+[tool.ruff.lint.isort]
+known-first-party = ["apps", "config"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.testing"
+python_files = ["test_*.py", "*_test.py"]
+testpaths = ["tests", "apps"]
+addopts = "--strict-markers --disable-warnings"
+
+[tool.coverage.run]
+source = ["apps", "config"]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "config/wsgi.py",
+    "config/asgi.py",
+    "manage.py",
+]
+
+[tool.coverage.report]
+# GATE OBLIGATORIO del proyecto.
+fail_under = 85
+show_missing = true
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]

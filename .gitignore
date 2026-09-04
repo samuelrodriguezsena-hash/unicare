@@ -1,0 +1,35 @@
+# Secretos: NUNCA versionar.
+# `.env` no cubre `.env.production` ni ningun otro sufijo: se ignoran todos
+# y se rescata solo la plantilla.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Django
+staticfiles/
+media/
+*.log
+
+# Celery
+.celerybeat-schedule*
+
+# Tests / cobertura
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Editores / SO
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,132 @@
+# UniCare - stack de PRODUCCION.
+#
+#   docker compose --env-file .env.production -f docker-compose.prod.yml up -d
+#
+# `--env-file` no es opcional: sin el, compose interpola ${UNICARE_IMAGE},
+# ${WEB_PORT} y ${POSTGRES_*} desde el `.env` del directorio -- que es el de
+# desarrollo. `env_file:` solo alimenta el entorno de los contenedores; la
+# interpolacion del propio YAML es otra cosa.
+#
+# Diferencias con `docker-compose.yml` (desarrollo), y el porque de cada una:
+#
+#   * La imagen es inmutable: NO se monta el codigo. Lo que corre es
+#     exactamente lo que se construyo y se probo.
+#   * Las settings son `config.settings.production` para los tres procesos.
+#   * Nada se publica hacia el exterior salvo `web`, y solo en el loopback del
+#     host: delante va un proxy inverso que termina TLS. Ver docs/DOCKER.md.
+#   * `restart: unless-stopped` en todo.
+#   * Los logs estan acotados: sin `max-size`, un contenedor de larga vida
+#     llena el disco del host.
+#   * Las migraciones NO se ejecutan solas. Son un paso explicito:
+#         docker compose -f docker-compose.prod.yml run --rm web migrate
+#
+# PostgreSQL es EXTERNO por defecto y se configura con DATABASE_URL: en
+# produccion la base de datos necesita copias de seguridad, actualizaciones y
+# persistencia que no deberian depender del ciclo de vida de este compose. Para
+# un despliegue en una sola maquina hay un servicio `db` bajo el perfil
+# `db-local` (ver docs/DOCKER.md).
+#
+# Ninguna credencial esta escrita aqui: todo viene de .env.production, que NO
+# se versiona.
+
+name: unicare-prod
+
+x-app: &app
+  image: ${UNICARE_IMAGE:-unicare:latest}
+  build:
+    context: .
+    args:
+      REQUIREMENTS: requirements/production.txt
+  env_file: [.env.production]
+  environment:
+    DJANGO_SETTINGS_MODULE: config.settings.production
+    # Fuera del codigo desplegado: el contenedor no tiene por que ser escribible.
+    CELERY_BEAT_SCHEDULE_FILENAME: /var/lib/unicare/celerybeat-schedule
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  redis:
+    image: redis:7-alpine
+    # `appendonly` para que una cola de recordatorios pendientes sobreviva a un
+    # reinicio del contenedor.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  web:
+    <<: *app
+    command: ["web"]
+    ports:
+      # Solo el loopback del host. El proxy inverso hace de puerta de entrada;
+      # publicar 0.0.0.0 expondria gunicorn sin TLS a la red.
+      - "127.0.0.1:${WEB_PORT:-8000}:8000"
+    depends_on:
+      redis: {condition: service_healthy}
+
+  worker:
+    <<: *app
+    command: ["worker"]
+    depends_on:
+      redis: {condition: service_healthy}
+
+  beat:
+    <<: *app
+    command: ["beat"]
+    volumes:
+      # Sin esto, beat pierde en cada reinicio el registro de la ultima
+      # ejecucion y vuelve a disparar el despacho al arrancar.
+      - beat_state:/var/lib/unicare
+    depends_on:
+      redis: {condition: service_healthy}
+
+  # Perfil `db-local`: solo para un despliegue en una sola maquina sin base de
+  # datos gestionada. Requiere ademas apuntar DATABASE_URL a este servicio.
+  #
+  #   docker compose -f docker-compose.prod.yml --profile db-local up -d
+  db:
+    profiles: ["db-local"]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  redis_data:
+  beat_state:
+  postgres_data:

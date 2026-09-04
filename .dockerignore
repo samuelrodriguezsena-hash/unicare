@@ -1,0 +1,35 @@
+# Lo que NO entra en la imagen.
+#
+# Regla de oro: ningun archivo de entorno. `.env` a secas no cubre
+# `.env.production`, y ese fichero horneado en la imagen serian credenciales
+# de produccion distribuidas con cada `docker push`.
+.env
+.env.*
+!.env.example
+
+# Control de versiones y entornos locales
+.git
+.gitignore
+.venv
+venv
+
+# Python
+__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+
+# Cobertura y tests: la imagen de produccion no los ejecuta; el pipeline si,
+# y lo hace antes de construirla.
+.coverage
+coverage.xml
+htmlcov
+tests
+
+# No aportan nada al runtime
+.github
+docs
+staticfiles
+docker-compose*.yml
+*.png
+*.jpg
