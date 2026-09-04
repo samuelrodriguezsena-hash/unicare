@@ -58,6 +58,34 @@ def env_list(name: str, default: str = "") -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
+def env_json_dict(name: str) -> dict[str, str]:
+    """Lee un objeto JSON de cadena a cadena. Vacio si la variable no esta.
+
+    Falla al arrancar si el JSON es invalido o no tiene esa forma: un mapeo mal
+    escrito que se ignorase en silencio daria un fallo mucho mas adelante y sin
+    relacion aparente con su causa.
+    """
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return {}
+
+    import json
+
+    try:
+        valor = json.loads(raw)
+    except ValueError as error:
+        raise ImproperlyConfigured(f"{name} no es JSON valido: {error}") from error
+
+    if not isinstance(valor, dict) or not all(
+        isinstance(clave, str) and isinstance(contenido, str)
+        for clave, contenido in valor.items()
+    ):
+        raise ImproperlyConfigured(
+            f"{name} debe ser un objeto JSON de cadena a cadena: " '{"clave": "valor"}.'
+        )
+    return valor
+
+
 # ---------------------------------------------------------------------------
 # Nucleo Django
 # ---------------------------------------------------------------------------
@@ -143,6 +171,22 @@ SYSTEM_USERNAME = env("SYSTEM_USERNAME", "system")
 IDENTIFICATION_NUMBER_PATTERN = env(
     "IDENTIFICATION_NUMBER_PATTERN", r"^[A-Za-z0-9][A-Za-z0-9.\-]{1,49}$"
 )
+
+# DEC-33: el nombre de las columnas del archivo de carga masiva no lo define
+# nadie -- ni el DER ni la documentacion funcional. El contrato canonico vive en
+# `apps.massive_load.parsers` y esta alineado con los snapshots de
+# `IMPORT_BATCH_ROW`, pero los archivos reales vendran exportados de otro
+# sistema y traeran las cabeceras que traigan.
+#
+# Este mapeo `cabecera del archivo -> columna canonica` permite adaptarse a
+# ellos SIN tocar codigo ni desplegar. Vacio por defecto: inventar aqui una
+# traduccion al castellano seria otra suposicion, y ya hay una de mas.
+#
+#   MASSIVE_LOAD_COLUMN_ALIASES='{"numero_identificacion": "identification_number"}'
+#
+# Que el destino de cada alias exista se comprueba en `massive_load.apps`:
+# aqui todavia no se pueden importar modulos de las apps.
+MASSIVE_LOAD_COLUMN_ALIASES = env_json_dict("MASSIVE_LOAD_COLUMN_ALIASES")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

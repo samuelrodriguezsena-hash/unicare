@@ -15,7 +15,14 @@ import pytest
 from django.conf import settings
 from rest_framework.test import APIClient
 
-from config.settings.base import ImproperlyConfigured, env, env_bool, env_int, env_list
+from config.settings.base import (
+    ImproperlyConfigured,
+    env,
+    env_bool,
+    env_int,
+    env_json_dict,
+    env_list,
+)
 
 
 class TestEnvHelpers:
@@ -53,6 +60,37 @@ class TestEnvHelpers:
     def test_env_list_ignora_vacios(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("UNICARE_TEST_LIST", "a, b ,,c")
         assert env_list("UNICARE_TEST_LIST") == ["a", "b", "c"]
+
+    def test_env_json_dict_vacio_si_no_esta(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("UNICARE_TEST_JSON", raising=False)
+        assert env_json_dict("UNICARE_TEST_JSON") == {}
+        monkeypatch.setenv("UNICARE_TEST_JSON", "   ")
+        assert env_json_dict("UNICARE_TEST_JSON") == {}
+
+    def test_env_json_dict_lee_el_mapeo(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("UNICARE_TEST_JSON", '{"nombres": "first_name"}')
+        assert env_json_dict("UNICARE_TEST_JSON") == {"nombres": "first_name"}
+
+    def test_env_json_dict_falla_si_no_es_json(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Un mapeo mal escrito que se ignorase daria un fallo mucho despues."""
+        monkeypatch.setenv("UNICARE_TEST_JSON", "{esto no es json")
+        with pytest.raises(ImproperlyConfigured) as exc:
+            env_json_dict("UNICARE_TEST_JSON")
+        assert "UNICARE_TEST_JSON" in str(exc.value)
+
+    @pytest.mark.parametrize(
+        "raw", ['["a", "b"]', '"cadena"', '{"clave": 3}', '{"clave": null}']
+    )
+    def test_env_json_dict_exige_cadena_a_cadena(
+        self, monkeypatch: pytest.MonkeyPatch, raw: str
+    ) -> None:
+        monkeypatch.setenv("UNICARE_TEST_JSON", raw)
+        with pytest.raises(ImproperlyConfigured):
+            env_json_dict("UNICARE_TEST_JSON")
 
 
 class TestConfiguracion:

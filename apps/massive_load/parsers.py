@@ -7,8 +7,9 @@ contenido de negocio: de eso se encarga el servicio, fila a fila, para que un
 dato incorrecto no tumbe la importacion entera.
 
 DEC-33: ni el DER ni la documentacion funcional definen las columnas del
-archivo. Se fija aqui un contrato minimo, alineado con lo que
-`IMPORT_BATCH_ROW` guarda como snapshot. **Requiere confirmacion.**
+archivo. El contrato canonico se fija aqui, alineado con lo que
+`IMPORT_BATCH_ROW` guarda como snapshot, y los archivos reales se adaptan a el
+con `MASSIVE_LOAD_COLUMN_ALIASES` -- sin tocar codigo.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ import io
 from datetime import date, datetime
 from typing import Any
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 
 # Columnas obligatorias del archivo.
@@ -53,18 +55,45 @@ class ImportParseError(ValidationError):
     """
 
 
-def _normalizar_cabecera(nombre: Any) -> str:
+def _plegar(nombre: Any) -> str:
+    """Forma comparable de una cabecera: sin espacios sobrantes, en minusculas."""
     return str(nombre or "").strip().lower().replace(" ", "_")
+
+
+def alias_configurados() -> dict[str, str]:
+    """Mapeo `cabecera del archivo -> columna canonica` (DEC-33).
+
+    Las claves se pliegan igual que las cabeceras del archivo, para que
+    configurar `"Numero Identificacion"` funcione igual que
+    `"numero_identificacion"`.
+    """
+    return {
+        _plegar(origen): destino
+        for origen, destino in getattr(
+            settings, "MASSIVE_LOAD_COLUMN_ALIASES", {}
+        ).items()
+    }
+
+
+def _normalizar_cabecera(nombre: Any) -> str:
+    plegada = _plegar(nombre)
+    return alias_configurados().get(plegada, plegada)
 
 
 def _comprobar_cabeceras(cabeceras: list[str]) -> None:
     faltan = COLUMNAS_OBLIGATORIAS - set(cabeceras)
-    if faltan:
-        raise ImportParseError(
-            "Al archivo le faltan columnas obligatorias: "
-            + ", ".join(sorted(faltan))
-            + "."
-        )
+    if not faltan:
+        return
+    # Decir solo lo que falta obliga a adivinar como se llamaba la columna en el
+    # archivo. Diciendo tambien lo que se encontro, la diferencia se ve de un
+    # vistazo y se corrige con un alias (DEC-33).
+    encontradas = ", ".join(sorted(c for c in cabeceras if c)) or "ninguna"
+    raise ImportParseError(
+        "Al archivo le faltan columnas obligatorias: "
+        + ", ".join(sorted(faltan))
+        + f". Columnas encontradas: {encontradas}. Si el archivo las nombra de "
+        "otra forma, mapealas con MASSIVE_LOAD_COLUMN_ALIASES."
+    )
 
 
 def _limpiar(valor: Any) -> str | None:

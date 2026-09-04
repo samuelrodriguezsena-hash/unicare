@@ -614,3 +614,100 @@ class TestCasosDefensivos:
 
         assert resultado.success_count == 0
         assert resultado.failure_count == 0
+
+
+class TestAliasDeColumnas:
+    """DEC-33: el nombre de las columnas del archivo no lo define nadie.
+
+    El contrato canonico esta alineado con los snapshots de `IMPORT_BATCH_ROW`,
+    pero un archivo real vendra exportado de otro sistema con las cabeceras que
+    traiga. `MASSIVE_LOAD_COLUMN_ALIASES` permite adaptarse a el sin tocar
+    codigo ni desplegar una version nueva.
+    """
+
+    ALIAS_CASTELLANO = {
+        "numero_identificacion": "identification_number",
+        "nombres": "first_name",
+        "apellidos": "last_name",
+        "patologia": "pathology",
+    }
+
+    CSV_CASTELLANO = (
+        "numero_identificacion,nombres,apellidos,patologia\n"
+        "1000000001,Ana,Gomez,Cancer de mama\n"
+    )
+
+    def test_sin_alias_un_archivo_con_otras_cabeceras_se_rechaza(self) -> None:
+        with pytest.raises(ImportParseError):
+            parse_csv(self.CSV_CASTELLANO.encode())
+
+    def test_con_alias_el_mismo_archivo_se_lee(self, settings) -> None:
+        settings.MASSIVE_LOAD_COLUMN_ALIASES = self.ALIAS_CASTELLANO
+        filas = parse_csv(self.CSV_CASTELLANO.encode())
+        assert filas == [
+            {
+                "identification_number": "1000000001",
+                "first_name": "Ana",
+                "last_name": "Gomez",
+                "pathology": "Cancer de mama",
+            }
+        ]
+
+    def test_tambien_en_xlsx(self, settings) -> None:
+        settings.MASSIVE_LOAD_COLUMN_ALIASES = self.ALIAS_CASTELLANO
+        archivo = xlsx_archivo(
+            [
+                ["numero_identificacion", "nombres", "apellidos", "patologia"],
+                ["1000000002", "Luis", "Perez", "Leucemia"],
+            ]
+        )
+        assert parse_xlsx(archivo.read())[0]["last_name"] == "Perez"
+
+    def test_la_clave_del_alias_se_pliega_igual_que_la_cabecera(self, settings) -> None:
+        """Configurar "Numero Identificacion" tiene que valer lo mismo."""
+        settings.MASSIVE_LOAD_COLUMN_ALIASES = {
+            "Numero Identificacion": "identification_number",
+            "Nombres": "first_name",
+            "Apellidos": "last_name",
+            "Patologia": "pathology",
+        }
+        filas = parse_csv(self.CSV_CASTELLANO.encode())
+        assert filas[0]["identification_number"] == "1000000001"
+
+    def test_el_error_dice_que_columnas_traia_el_archivo(self) -> None:
+        """Decir solo lo que falta obliga a adivinar como se llamaba.
+
+        Con las encontradas delante, la diferencia se ve y se corrige con un
+        alias. Es la diferencia entre un error util y uno que no dice nada.
+        """
+        with pytest.raises(ImportParseError) as exc:
+            parse_csv(self.CSV_CASTELLANO.encode())
+        mensaje = str(exc.value)
+        assert "identification_number" in mensaje  # lo que falta
+        assert "numero_identificacion" in mensaje  # lo que traia
+        assert "MASSIVE_LOAD_COLUMN_ALIASES" in mensaje  # como arreglarlo
+
+
+class TestValidacionDeAliasAlArrancar:
+    """Un alias con el destino mal escrito no puede pasar desapercibido.
+
+    El parser ignora en silencio las cabeceras desconocidas, asi que un destino
+    mal escrito se manifestaria como "falta una columna obligatoria" que en el
+    archivo esta a la vista. Es preferible no arrancar.
+    """
+
+    def test_un_destino_inexistente_impide_arrancar(self, settings) -> None:
+        from django.apps import apps as registro
+        from django.core.exceptions import ImproperlyConfigured
+
+        settings.MASSIVE_LOAD_COLUMN_ALIASES = {"nombres": "nombre_de_pila"}
+        with pytest.raises(ImproperlyConfigured) as exc:
+            registro.get_app_config("massive_load").ready()
+        assert "nombre_de_pila" in str(exc.value)
+        assert "first_name" in str(exc.value)  # dice cuales si valen
+
+    def test_un_destino_valido_deja_arrancar(self, settings) -> None:
+        from django.apps import apps as registro
+
+        settings.MASSIVE_LOAD_COLUMN_ALIASES = {"nombres": "first_name"}
+        registro.get_app_config("massive_load").ready()

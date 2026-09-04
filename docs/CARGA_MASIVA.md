@@ -39,9 +39,34 @@ columnas de más.
 Fechas admitidas: `YYYY-MM-DD`, `DD/MM/YYYY`, `DD-MM-YYYY`. En XLSX, las celdas con formato de
 fecha se aceptan directamente.
 
-> **DEC-33:** ni el DER ni la documentación funcional definen las columnas del archivo. Este
-> contrato mínimo está alineado con lo que `IMPORT_BATCH_ROW` guarda como snapshot.
-> **Requiere confirmación.**
+### Si el archivo nombra las columnas de otra forma
+
+Ni el DER ni la documentación funcional definen las columnas del archivo (**DEC-33**), así que
+el contrato de arriba es una elección de este proyecto, alineada con lo que `IMPORT_BATCH_ROW`
+guarda como snapshot. Un archivo exportado de otro sistema traerá las cabeceras que traiga, y
+para eso está `MASSIVE_LOAD_COLUMN_ALIASES` — un mapeo `cabecera del archivo → columna
+canónica` que **evita tener que tocar código**:
+
+```
+MASSIVE_LOAD_COLUMN_ALIASES={"numero_identificacion":"identification_number","nombres":"first_name","apellidos":"last_name","patologia":"pathology"}
+```
+
+Viene **vacío**. Traducir al castellano dentro del código sería una segunda suposición encima
+de la primera; mejor que lo fije quien tenga el archivo real delante.
+
+Dos salvaguardas, porque un mapeo mal escrito es difícil de diagnosticar:
+
+- Un alias cuyo destino **no es una columna reconocida impide arrancar**, con la lista de las
+  válidas. Si no, el parser lo ignoraría en silencio y el síntoma sería una importación que
+  falla por "falta una columna obligatoria" que en el archivo está a la vista.
+- Si faltan columnas obligatorias, el error dice **también las que traía el archivo**, para que
+  la diferencia se vea de un vistazo:
+
+```
+Al archivo le faltan columnas obligatorias: first_name, identification_number, last_name,
+pathology. Columnas encontradas: apellidos, nombres, numero_identificacion, patologia.
+Si el archivo las nombra de otra forma, mapealas con MASSIVE_LOAD_COLUMN_ALIASES.
+```
 
 Tope de **10 000 filas** por archivo, para que uno enorme no agote la memoria del worker.
 

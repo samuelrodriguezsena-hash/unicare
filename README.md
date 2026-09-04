@@ -135,7 +135,7 @@ scripts/ci.sh
 ```
 
 El gate de cobertura es **85 %** (`pyproject.toml`); la cobertura actual es del **100 %** sobre
-957 tests. Ver [`docs/TESTING.md`](docs/TESTING.md).
+971 tests. Ver [`docs/TESTING.md`](docs/TESTING.md).
 
 `tests/test_der_contract.py` compara los modelos, columna por columna, contra el inventario
 del DER en `tests/der_inventory.py`. **Si falla, se corrige el modelo, no el test** — salvo que
