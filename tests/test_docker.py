@@ -596,3 +596,24 @@ class TestPasoDeCheckDeploy:
     def test_la_clave_de_ejemplo_supera_el_umbral_de_django(self) -> None:
         """W009 exige 50 caracteres. No es un secreto, pero tiene que ser larga."""
         assert len(self._entorno_del_workflow()["DJANGO_SECRET_KEY"]) >= 50
+
+
+class TestFinalesDeLinea:
+    """Los scripts que van dentro de la imagen tienen que llegar con LF.
+
+    En Windows `core.autocrlf=true` es el valor por defecto: al clonar, el
+    entrypoint saldria con CRLF, `docker build` lo copiaria asi a la imagen y el
+    contenedor arrancaria con `bad interpreter: /usr/bin/env bash^M`. No hay
+    forma de ver eso hasta desplegar, de ahi el .gitattributes.
+    """
+
+    ATRIBUTOS = (RAIZ / ".gitattributes").read_text(encoding="utf-8")
+
+    def test_gitattributes_fuerza_lf(self) -> None:
+        assert "* text=auto eol=lf" in self.ATRIBUTOS
+        assert "*.sh        text eol=lf" in self.ATRIBUTOS
+
+    def test_los_scripts_del_contenedor_no_tienen_crlf(self) -> None:
+        for nombre in ("entrypoint.sh", "ci.sh", "healthcheck.py"):
+            crudo = (RAIZ / "scripts" / nombre).read_bytes()
+            assert b"\r\n" not in crudo, nombre

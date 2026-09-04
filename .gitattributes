@@ -1,0 +1,20 @@
+# Finales de linea.
+#
+# En Windows, `core.autocrlf=true` (el valor por defecto) convierte a CRLF al
+# hacer checkout. Los scripts de shell que van DENTRO de la imagen no lo
+# toleran: el contenedor arrancaria con `bad interpreter: /usr/bin/env bash^M`
+# y no habria forma de verlo hasta desplegar.
+#
+# Por eso todo el arbol se normaliza a LF: es lo que espera el runtime Linux
+# del contenedor y lo que ya hay en el repositorio.
+* text=auto eol=lf
+
+# Explicitos, porque son los que rompen de verdad.
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+*.yml       text eol=lf
+
+# Binarios: que git no intente normalizarlos.
+*.png binary
+*.jpg binary
+*.xlsx binary
