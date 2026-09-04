@@ -113,11 +113,18 @@ ninguno es real:
 Las integraciones externas están mockeadas y la suite **bloquea las conexiones de red** a nivel
 de socket, así que el pipeline es determinista y no depende de terceros.
 
-## Sin verificar
+## Ejecutado en el runner
 
-- **El workflow no se ha ejecutado en GitHub Actions.** El proyecto todavía no es un
-  repositorio git, así que el YAML está validado sintáctica y estructuralmente, y sus pasos
-  ejecutados en local vía `scripts/ci.sh`, pero **no en el runner**.
-- **El build de la imagen no se ha ejecutado.** Docker Desktop necesita WSL, que no está
-  instalado y no se puede instalar sin privilegios de administrador. Sigue pendiente desde la
-  FASE 2. Lo que sí se verifica sin daemon está en [`DOCKER.md`](DOCKER.md).
+El pipeline se ejecutó por primera vez en GitHub Actions el **2026-09-04**, sobre el commit
+`30bb668`, y **los tres jobs pasaron**.
+
+Eso cierra lo único que no se podía comprobar en el entorno de desarrollo: el job `imagen`
+construyó la imagen, arrancó el contenedor y **su propio HEALTHCHECK lo declaró sano**. Con
+ello quedan verificados de una vez el `Dockerfile`, el entrypoint, gunicorn, las settings de
+producción y la sonda — incluidas las correcciones DEC-40 y DEC-41, sin las cuales ese paso
+habría fallado.
+
+El entorno de desarrollo sigue sin motor de Docker (Docker Desktop necesita WSL, que no está
+instalado y no se puede instalar sin privilegios de administrador), así que **el build se
+verifica en CI, no en local**. Lo que sí se comprueba sin daemon está en
+[`DOCKER.md`](DOCKER.md).

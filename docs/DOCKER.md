@@ -156,14 +156,14 @@ instalar sin privilegios de administrador). Así que:
 | Formato del log de acceso | **Ejecutado** con el formateador de gunicorn (en CI; en Windows no se importa) |
 | `docker-compose.prod.yml` | **Validado** con `docker compose config`, que no necesita daemon |
 | Usuario no root, multi-stage, sin secretos, `.dockerignore` | Comprobado leyendo los ficheros |
-| **El build de la imagen** | **Nunca se ha ejecutado aquí** |
-| **El contenedor arrancando de verdad** | **Nunca se ha ejecutado aquí** |
+| **El build de la imagen** | **Ejecutado en CI**, nunca en local |
+| **El contenedor arrancando y declarándose sano** | **Ejecutado en CI**, nunca en local |
 
-Las dos últimas se cubren en CI: el job `imagen` construye la imagen, la
-arranca y espera a que su **propio HEALTHCHECK** la declare sana — lo que
+Las dos últimas las cubre el job `imagen` del pipeline, que construye la imagen,
+la arranca y espera a que su **propio HEALTHCHECK** la declare sana — lo que
 ejercita gunicorn, el entrypoint, las settings de producción y la sonda a la
-vez. Ese job no se ha ejecutado todavía porque el proyecto aún no es un
-repositorio git. Ver [`CI.md`](CI.md).
+vez. **Se ejecutó por primera vez el 2026-09-04 y pasó**, junto con los otros dos
+jobs. Ver [`CI.md`](CI.md).
 
 Los tests están en `tests/test_docker.py`. El procedimiento de puesta en
 producción está en [`DEPLOYMENT.md`](DEPLOYMENT.md).

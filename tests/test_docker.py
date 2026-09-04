@@ -17,7 +17,9 @@ Lo que se comprueba leyendo los ficheros (Dockerfile, .dockerignore, compose):
 propiedades que un build tampoco demostraria mejor, como que no haya secretos
 o que el proceso no corra como root.
 
-Lo unico que sigue sin verificarse es el build en si. Ver docs/DOCKER.md.
+El build en si no se puede hacer aqui, pero lo hace el pipeline: el job `imagen`
+construye la imagen, la arranca y espera a que su propio HEALTHCHECK la declare
+sana. Paso el 2026-09-04. Ver docs/DOCKER.md.
 """
 
 from __future__ import annotations

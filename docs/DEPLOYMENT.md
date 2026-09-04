@@ -368,14 +368,15 @@ Contra un PostgreSQL 16 real, con `config.settings.production` cargadas:
 | Liveness y readiness | **Ejecutados**, incluido el 503 con Redis caído |
 | La API con Redis caído | **Ejecutada** — sigue respondiendo 200 |
 | Marcha atrás de migraciones y reaplicación | **Ejecutadas** |
-| **Build de la imagen** | **No ejecutado**: no hay engine de Docker en el entorno de desarrollo |
-| **El stack de compose levantado** | **No ejecutado**, por lo mismo |
+| **Build de la imagen** | **Ejecutado en CI**. En local no: no hay engine de Docker |
+| El contenedor arrancando y declarándose sano | **Ejecutado en CI** |
+| **El stack de compose levantado** | **No ejecutado**: ni en local ni en CI |
 | Un despliegue completo detrás de nginx con TLS | **No ejecutado**: requiere servidor y dominio |
 
-Las dos primeras se cubren en el pipeline: el job `imagen` construye la imagen,
-la arranca y espera a que su propio `HEALTHCHECK` la declare sana. Ese job no se
-ha ejecutado todavía porque el proyecto aún no es un repositorio git. Ver
-[`CI.md`](CI.md) y [`DOCKER.md`](DOCKER.md).
+El build y el arranque los cubre el job `imagen` del pipeline, que **se ejecutó por primera
+vez el 2026-09-04 y pasó**. Lo que sigue sin ejercitarse en ningún sitio es el stack de compose
+completo y un despliegue real detrás de nginx con TLS. Ver [`CI.md`](CI.md) y
+[`DOCKER.md`](DOCKER.md).
 
 ---
 

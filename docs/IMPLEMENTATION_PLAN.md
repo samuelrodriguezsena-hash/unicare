@@ -20,13 +20,14 @@ inmutable, sin puertos al exterior salvo `web` en loopback, logs acotados, Postg
 La sonda de salud pasa a ser `scripts/healthcheck.py`. Se detectaron y corrigieron **dos fallos
 que dejaban el contenedor *unhealthy* para siempre** (DEC-40, DEC-41), ejecutando la aplicacion
 WSGI con settings de produccion. 40 tests nuevos en `tests/test_docker.py`. Ver
-[`DOCKER.md`](DOCKER.md). **El build de la imagen sigue sin ejecutarse**: no hay engine de Docker
-en este entorno.
+[`DOCKER.md`](DOCKER.md). El build de la imagen **no se ejecuta en local** (no hay engine de
+Docker en este entorno) pero **si en CI**, donde paso el 2026-09-04.
 
 **FASE 16 completa:** pipeline de GitHub Actions con tres jobs (calidad, settings de
 producción, imagen) y `scripts/ci.sh` para ejecutar los mismos pasos en local. Ver
-[`CI.md`](CI.md). **El workflow no se ha ejecutado en un runner**: el proyecto aún no es un
-repositorio git.
+[`CI.md`](CI.md). **Ejecutado en GitHub Actions el 2026-09-04 sobre el commit `30bb668`: los
+tres jobs pasaron**, incluido el que construye la imagen y comprueba que el contenedor se
+declara sano.
 
 **FASE 15 completa:** 912 tests y **100 % de cobertura** (gate del 85 %), aislamiento de red
 verificado, factories de `factory-boy` y garantías sobre la propia suite. Ver
