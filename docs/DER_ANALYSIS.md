@@ -1,12 +1,14 @@
 # UniCare — DER_ANALYSIS
 
-**Fuente inspeccionada:** `Diagrama en blanco (2).png` (3829 x 2260 px), raíz del repositorio.
+**Fuente inspeccionada:** [`DER.png`](DER.png) (3829 x 2260 px). El archivo se entregó como
+`Diagrama en blanco (2).png` en la raíz del repositorio; se renombró sin tocar su contenido.
 **Fecha de inspección:** 2026-08-30
 **Estado:** FASE 0 — análisis. No se ha escrito código ni migraciones.
 
 > **D-00 (discrepancia documental).** La documentación normativa referencia el archivo
-> `"Diagrama en blanco (2)-1024.jpg"`. En el repositorio existe únicamente
-> `Diagrama en blanco (2).png`. Se asume que es el mismo artefacto. **Requiere confirmación.**
+> `"Diagrama en blanco (2)-1024.jpg"`. Lo entregado fue `Diagrama en blanco (2).png`
+> (hoy `docs/DER.png`), y no hay ningún `.jpg` en el repositorio. Se asume que es el mismo
+> artefacto. **Requiere confirmación.**
 
 ---
 

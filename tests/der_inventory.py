@@ -1,6 +1,6 @@
 """Inventario del DER en forma legible por maquina.
 
-Transcripcion de `Diagrama en blanco (2).png`, tabla por tabla. Es la version
+Transcripcion de `docs/DER.png`, tabla por tabla. Es la version
 ejecutable de docs/DER_ANALYSIS.md seccion 2 y sirve de contrato verificable:
 `tests/test_der_contract.py` compara los modelos Django contra este inventario.
 

@@ -3,7 +3,7 @@
 Plataforma backend para la gestión simplificada de pacientes oncológicos.
 Django 5.2 · DRF · PostgreSQL · Redis · Celery · Docker.
 
-> El **DER** (`Diagrama en blanco (2).png`) es el contrato del modelo de datos.
+> El **DER** ([`docs/DER.png`](docs/DER.png)) es el contrato del modelo de datos.
 > Antes de tocar modelos, lee [`docs/DER_ANALYSIS.md`](docs/DER_ANALYSIS.md) y
 > [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
