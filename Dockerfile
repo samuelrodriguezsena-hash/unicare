@@ -9,19 +9,30 @@ FROM python:3.12-slim AS builder
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    POETRY_VERSION=1.8.3 \
+    POETRY_HOME=/opt/poetry \
+    POETRY_VIRTUALENVS_CREATE=false \
+    POETRY_NO_INTERACTION=1
 
 WORKDIR /build
 
 RUN apt-get update \
-    && apt-get install --no-install-recommends -y build-essential libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get install --no-install-recommends -y build-essential libpq-dev curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m pip install --upgrade pip \
+    && pip install "poetry==${POETRY_VERSION}"
 
+COPY pyproject.toml ./
 COPY requirements/ requirements/
 ARG REQUIREMENTS=requirements/production.txt
-RUN python -m venv /opt/venv \
-    && /opt/venv/bin/pip install --upgrade pip \
-    && /opt/venv/bin/pip install -r ${REQUIREMENTS}
+RUN if poetry check >/dev/null 2>&1; then \
+        poetry install --only main --no-root --no-interaction; \
+    else \
+        python -m venv /opt/venv \
+        && /opt/venv/bin/pip install --upgrade pip \
+        && /opt/venv/bin/pip install -r ${REQUIREMENTS}; \
+    fi
 
 # ---------------------------------------------------------------------------
 # Stage 2: runtime
