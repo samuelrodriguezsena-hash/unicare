@@ -61,7 +61,10 @@ def _current_config() -> tuple[str, float, str, str]:
         str(getattr(settings, "FARMACOS_APP_TOKEN", "") or ""),
     )
 
-def _build_client(base_url: str, timeout: float, api_key: str, app_token: str) -> httpx.Client:
+
+def _build_client(
+    base_url: str, timeout: float, api_key: str, app_token: str
+) -> httpx.Client:
     headers = {"Accept": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -74,7 +77,6 @@ def _build_client(base_url: str, timeout: float, api_key: str, app_token: str) -
         headers=headers,
         follow_redirects=False,
     )
-
 
 
 def get_client() -> httpx.Client:
