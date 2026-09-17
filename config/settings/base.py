@@ -355,6 +355,8 @@ FARMACOS_CACHE_TTL = env_int("FARMACOS_CACHE_TTL", 900)
 # basta con definir esta variable: el cliente la envia como Bearer y no hay que
 # tocar codigo. Vacia = sin autenticacion.
 FARMACOS_API_KEY = os.environ.get("FARMACOS_API_KEY", "")
+# Socrata app token for higher quota
+FARMACOS_APP_TOKEN = os.environ.get("FARMACOS_APP_TOKEN", "")
 
 # Gemini. C-08: el patron de invocacion queda confinado a GeminiService._invoke.
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")

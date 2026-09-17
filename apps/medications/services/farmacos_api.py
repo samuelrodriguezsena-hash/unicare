@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 # Ruta del recurso dentro de la API externa. Es parte del contrato publicado
 # del servicio, no configuracion de despliegue: el host (lo unico que cambia
 # entre entornos) viene de FARMACOS_API_BASE_URL.
-FARMACOS_ENDPOINT_PATH: Final[str] = "/v1/farmacos"
+FARMACOS_ENDPOINT_PATH: Final[str] = "/resource/qj5z-zabx.json"
 
 # Limites del pool. Reutilizar conexiones es lo que mantiene la latencia baja
 # cuando llegan consultas repetidas de autocompletado.
@@ -49,24 +49,24 @@ _POOL_LIMITS: Final[httpx.Limits] = httpx.Limits(
 )
 
 _client: httpx.Client | None = None
-_client_config: tuple[str, float, str] | None = None
+_client_config: tuple[str, float, str, str] | None = None
 
 
-def _current_config() -> tuple[str, float, str]:
+def _current_config() -> tuple[str, float, str, str]:
     """Configuracion vigente del cliente, leida siempre de settings."""
     return (
         str(settings.FARMACOS_API_BASE_URL).rstrip("/"),
         float(settings.FARMACOS_API_TIMEOUT),
         str(getattr(settings, "FARMACOS_API_KEY", "") or ""),
+        str(getattr(settings, "FARMACOS_APP_TOKEN", "") or ""),
     )
 
-
-def _build_client(base_url: str, timeout: float, api_key: str) -> httpx.Client:
+def _build_client(base_url: str, timeout: float, api_key: str, app_token: str) -> httpx.Client:
     headers = {"Accept": "application/json"}
-    # La API es hoy publica y sin autenticacion. Si en el futuro exige una
-    # credencial, basta con definir FARMACOS_API_KEY: no hay que tocar codigo.
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
+    if app_token:
+        headers["X-App-Token"] = app_token
     return httpx.Client(
         base_url=base_url,
         timeout=timeout,
@@ -74,6 +74,7 @@ def _build_client(base_url: str, timeout: float, api_key: str) -> httpx.Client:
         headers=headers,
         follow_redirects=False,
     )
+
 
 
 def get_client() -> httpx.Client:
@@ -119,7 +120,9 @@ class FarmacosAPIClient:
         `filters` debe venir ya validado por `FarmacoFilterSerializer`: aqui no
         se acepta nada que el cliente no haya podido comprobar antes.
         """
-        response = self._request(filters)
+        # Translate internal filter keys to Socrata column names
+        socrata_filters = {self._field_map().get(k, k): v for k, v in filters.items()}
+        response = self._request(socrata_filters)
         self._raise_for_status(response)
         return self._parse(response)
 
@@ -175,7 +178,16 @@ class FarmacosAPIClient:
             self._report(FarmacosAPIResponseError(message), message)
             raise FarmacosAPIResponseError
 
-        serializer = FarmacoSerializer(data=payload, many=True)
+        # Map Socrata column names back to internal field names before validation
+        internal_payload = []
+        for item in payload:
+            mapped_item = {
+                internal: item.get(socrata)
+                for internal, socrata in self._field_map().items()
+            }
+            internal_payload.append(mapped_item)
+
+        serializer = FarmacoSerializer(data=internal_payload, many=True)
         try:
             serializer.is_valid(raise_exception=True)
         except serializers.ValidationError as exc:
@@ -185,6 +197,22 @@ class FarmacosAPIClient:
         # `validated_data` deja exactamente los cinco campos del contrato: si la
         # API externa anade campos nuevos, no se filtran hacia nuestro cliente.
         return [dict(item) for item in serializer.validated_data]
+
+    @staticmethod
+    @staticmethod
+    def _field_map() -> dict[str, str]:
+        """Map internal filter/field names to Socrata column names.
+
+        Returns a dict where keys are internal names (used by our API) and values
+        are the corresponding column names in the Socrata dataset.
+        """
+        return {
+            "Nombre_Medicamento": "producto",
+            "Dosis_Comun": "dosis",
+            "Compuesto_Principal": "principioactivo",
+            "Patologia_Comun": "patologia",
+            "Familia_Farmaco": "familia",
+        }
 
     @staticmethod
     def _report(exc: Exception, message: str) -> None:

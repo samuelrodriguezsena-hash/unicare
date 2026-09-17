@@ -33,7 +33,9 @@ case "${ROLE}" in
       --concurrency "${CELERY_CONCURRENCY:-2}"
     ;;
   beat)
-    exec celery -A config beat --loglevel "${CELERY_LOG_LEVEL:-info}"
+    exec celery -A config beat \
+      --loglevel "${CELERY_LOG_LEVEL:-info}" \
+      --schedule "${CELERYBEAT_SCHEDULE_FILE:-/app/.celerybeat-schedule}"
     ;;
   migrate)
     exec python manage.py migrate --noinput
