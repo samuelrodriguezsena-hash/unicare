@@ -36,7 +36,7 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_USER: unicare
-          POSTGRES_PASSWORD: unicare
+          POSTGRES_PASSWORD: unicare_pwd
           POSTGRES_DB: unicare
         ports:
           - 5432:5432
@@ -48,11 +48,11 @@ jobs:
 
     env:
       DJANGO_SETTINGS_MODULE: config.settings.testing
-      DATABASE_URL: postgres://unicare:unicare@localhost:5432/unicare
+      DATABASE_URL: postgres://unicare:unicare_pwd@localhost:5432/unicare
       # `testing` fija valores por defecto para el resto; se declaran aqui de
       # forma explicita para que el pipeline no dependa de ellos.
       REDIS_URL: redis://localhost:6379/0
-      FARMACOS_API_BASE_URL: https://farmacos.invalid
+      FARMACOS_API_BASE_URL: https://www.datos.gov.co/resource
       GEMINI_API_KEY: ""
 
     steps:
